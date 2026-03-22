@@ -72,7 +72,7 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      */
     @Override
     public ReferenceDetection sampleForCalibration() {
-        SensorFrame frame = readSensorFrame();
+        SensorFrame frame = readSensor();
         currentSurface = classifySurface(frame);
 
         // TODO: replace this placeholder with real separator detection logic.
@@ -104,7 +104,7 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
             return;
         }
 
-        SensorFrame frame = readSensorFrame();
+        SensorFrame frame = readSensor();
         currentSurface = classifySurface(frame);
 
         updateArtifactLatch(frame, currentSurface);
@@ -146,7 +146,7 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      *
      * @return current raw-and-derived sensor frame.
      */
-    private SensorFrame readSensorFrame() {
+    private SensorFrame readSensor() {
         int red1 = sensor1.red();
         int green1 = sensor1.green();
         int blue1 = sensor1.blue();
@@ -180,6 +180,9 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      */
     private SurfaceKind classifySurface(SensorFrame frame) {
         // TODO: replace placeholder heuristics with tuned logic.
+
+
+
         return SurfaceKind.UNKNOWN;
     }
 
@@ -253,6 +256,8 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
     }
 
     /**
+     * Save RGB and hue values from sensor
+     *
      * One raw-and-derived sensor snapshot from both color sensors.
      */
     private static final class SensorFrame {
