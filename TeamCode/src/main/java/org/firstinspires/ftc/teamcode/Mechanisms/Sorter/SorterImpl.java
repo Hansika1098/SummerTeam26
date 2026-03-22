@@ -409,7 +409,6 @@ public class SorterImpl implements Sorter {
     private void updatePresentSlot() {
 
         //work needed for this func:
-        //define target angle:
         // TODO: implement motion and completion rules for slot presentation.
         //read the current angle fo spinner
         if(targetSlot <0) return; //only runs if slot has been commanded
@@ -422,7 +421,7 @@ public class SorterImpl implements Sorter {
 
         if (Math.abs(error)<1.0) {
             setSpinnerPower(0.0);
-            shootSlot = targetSlot;  //if distance to target less than  1 check these things
+            shootSlot = targetSlot;  //if distance to target less than  1 do these things
             shootAligned = true;
             targetSlot = -1;
             action = SorterAction.IDLE;
