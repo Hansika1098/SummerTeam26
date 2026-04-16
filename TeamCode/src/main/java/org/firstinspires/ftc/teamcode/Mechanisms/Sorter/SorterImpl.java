@@ -369,7 +369,7 @@ public class SorterImpl implements Sorter {
      *
      * <ul>
      *   <li>rotate the spinner slowly,
-     *   <li>call {@link LoadStationObserver#sampleForCalibration()},
+     *   <li>call {@link LoadStationObserver#//sampleForCalibration()},
      *   <li>lock the separator reference when it is detected,
      *   <li>align from separator reference to a slot-center reference,
      *   <li>populate {@code loadSlot}, {@code shootSlot}, and alignment state,
@@ -378,6 +378,11 @@ public class SorterImpl implements Sorter {
      */
     private void updateCalibration() {
         // TODO: implement calibration state machine.
+
+
+
+
+
 
 
 
@@ -390,6 +395,36 @@ public class SorterImpl implements Sorter {
      * intervention that invalidated the slot table.
      */
     private void updateInventoryScan() {
+        private void updateInventoryScan() {
+
+            // Safety: if we somehow lose calibration, stop immediately.
+            if (!isCalibrated()) {
+                setSpinnerPower(0.0);
+                action = SorterAction.IDLE;
+                return;
+            }
+
+            // Drive spinner slowly so slots pass under the load station
+            setSpinnerPower(0.3);
+
+            // Reuse the same pass-based observation system already used in IDLE mode
+            updateIdleObservation();
+
+            // Check if inventory is now fully known (scan complete)
+            boolean allKnown = true;
+            for (SlotContent slot : slots) {
+                if (slot == SlotContent.UNKNOWN) {
+                    allKnown = false;
+                    break;
+                }
+            }
+
+            // If everything is known, stop scanning
+            if (allKnown) {
+                setSpinnerPower(0.0);
+                action = SorterAction.IDLE;
+            }
+        }
         // TODO: implement inventory-scan state machine.
     }
 
@@ -397,7 +432,47 @@ public class SorterImpl implements Sorter {
      * Updates the action that moves a known-empty slot to the load station.
      */
     private void updatePrepareLoad() {
+
+        private void updatePrepareLoad() {
+
+            // must have valid slot chosen at LOAD  moves known empty slot to load station
+            if (loadSlot < 0) return;
+
+            // optional safety: only run in correct state
+            if (action != SorterAction.PREPARING_LOAD) return;
+
+            double currentAngle = getCurrentSpinnerAngle();
+
+            // target angle for load station slot
+            double targetAngle = getAngleForSlot(loadSlot);
+
+            double error = targetAngle - currentAngle;
+
+            // wrap correction (IMPORTANT for correctness)
+            error = (error + 180) % 360 - 180;
+
+            if (Math.abs(error) < 1.0) {
+
+                setSpinnerPower(0.0);
+
+                loadAligned = true;
+
+                // finished preparing load
+                action = SorterAction.IDLE;
+
+            } else {
+
+                double power = 0.3 * Math.signum(error);
+                setSpinnerPower(power);
+            }
+        }
         // TODO: implement motion and completion rules for prepare-load.
+
+
+
+
+
+
     }
 
     /**
@@ -414,6 +489,8 @@ public class SorterImpl implements Sorter {
 
         //calculate the error  (distance from target)
         double error = targetAngle - currentAngle;
+
+          error = (error + 180) % 360 - 180;
 
 
         if (Math.abs(error)<1.0) {
