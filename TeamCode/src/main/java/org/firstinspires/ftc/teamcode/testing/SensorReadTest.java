@@ -10,40 +10,43 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 import java.util.Locale;
 
+import edu.ftcphoenix.fw.core.color.NormalizedRgba;
+import edu.ftcphoenix.fw.core.source.Source;
+import edu.ftcphoenix.fw.core.time.LoopClock;
+import edu.ftcphoenix.fw.ftc.FtcSensors;
+
 @TeleOp(name = "Sensor read test", group = "test")
 public class SensorReadTest extends LinearOpMode {
 
-    ColorSensor sensorColor;
+    NormalizedColorSensor sensorColor;
 
     @Override
     public void runOpMode() {
+
+        LoopClock clock = new LoopClock();
+        clock.reset(getRuntime());
+
         // get reference to the color sensor
-        sensorColor = hardwareMap.get(ColorSensor.class, "colorSensor");
+        sensorColor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
 
-        // hsvValues is an array holding the hue, saturation, and value info
-        float hsvValues[] = {0F, 0f, 0f};
+        sensorColor.setGain(0.6f);
 
-        // values is a reference to hsvValues array
-        final float values[] = hsvValues;
-
-        // create scale factor to multiply RGB values with (amplify measured values)
-        final double SCALE_FACTOR = 255;
-
-        // get reference to the RelativeLayout to change background color of driver hub
-        // to the hue detected by sensor
-        int relativeLayoutId = hardwareMap.appContext.getResources().getIdentifier("RelativeLayout", "id", hardwareMap.appContext.getPackageName());
-        final View relativeLayout = ((Activity) hardwareMap.appContext).findViewById(relativeLayoutId);
+        Source<NormalizedRgba> sensorSource = FtcSensors.normalizedRgba(sensorColor);
 
         // wait for the start button to be pressed
         waitForStart();
 
         // loop & read RGB data
         while (opModeIsActive()) {
+
+            NormalizedRgba color = sensorSource.get(clock);
+            /*
             // convert RGB values to HSV values
             // multiply by the scale factor
             // cast it back to int (SCALE_FACTOR is a double)
@@ -68,32 +71,18 @@ public class SensorReadTest extends LinearOpMode {
             else if (hue >= 150 && hue <= 170) {
                 object = "GREEN";
             }
+             */
 
             // send info back to driver station using telemetry
-            telemetry.addData("Alpha", sensorColor.alpha());
-            telemetry.addData("Red  ", sensorColor.red());
-            telemetry.addData("Green", sensorColor.green());
-            telemetry.addData("Blue ", sensorColor.blue());
-            telemetry.addData("Hue", hsvValues[0]);
-            telemetry.addData("Object", object);
-
-            // change background color to match color detected by the RGB sensor
-            relativeLayout.post(new Runnable() {
-                public void run() {
-                    relativeLayout.setBackgroundColor(Color.HSVToColor(0xff, values));
-                }
-            });
+            telemetry.addData("Alpha", color.a);
+            telemetry.addData("rRatio", color.rRatio());
+            telemetry.addData("gRatio", color.gRatio());
+            telemetry.addData("bRatio", color.bRatio());
+            telemetry.addData("Chroma", color.chroma());
 
             telemetry.update();
 
         }
-
-        // Set panel back to default color
-        relativeLayout.post(new Runnable() {
-            public void run() {
-                relativeLayout.setBackgroundColor(Color.WHITE);
-            }
-        });
     }
 
 }

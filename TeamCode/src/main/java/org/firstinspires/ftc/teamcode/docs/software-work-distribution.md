@@ -32,7 +32,7 @@ Primary files:
 
 - `LoadStationObserver.java`
 - `DualColorLoadStationObserver.java`
-- `ReferenceDetection.java`
+- `SeparatorDetection.java`
 - `SlotReadResult.java`
 - `ObserverDebug.java`
 - `SurfaceKind.java`

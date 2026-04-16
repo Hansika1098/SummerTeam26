@@ -1,0 +1,35 @@
+package edu.ftcphoenix.fw.drive.guidance;
+
+/**
+ * Semantic 2D reference point for {@link DriveGuidance}.
+ *
+ * <p>A reference point answers only one question: <em>where is the meaningful point?</em> It does
+ * <strong>not</strong> say how that point will be solved. The same immutable reference may be
+ * translated to, aimed at, checked by a query, or ignored until some other system asks for it.</p>
+ *
+ * <h2>Common usage</h2>
+ *
+ * <pre>{@code
+ * ReferencePoint2d speakerAim = References.fieldPoint(48.0, 24.0);
+ *
+ * DriveGuidancePlan aimPlan = DriveGuidance.plan()
+ *         .aimTo()
+ *             .point(speakerAim)
+ *             .doneAimTo()
+ *         .resolveWith()
+ *             .localizationOnly()
+ *             .localization(poseEstimator)
+ *             .doneResolveWith()
+ *         .build();
+ * }</pre>
+ *
+ * <p>References can be authored in field coordinates, relative to one fixed AprilTag ID, or
+ * relative to a shared {@code TagSelectionSource}. The point object itself remains immutable;
+ * selected-tag references resolve through the selector's current state at evaluation time.</p>
+ *
+ * @see ReferenceFrame2d when the reference also has a meaningful local orientation
+ * @see References
+ */
+public interface ReferencePoint2d {
+    // Marker interface for the public guidance API.
+}

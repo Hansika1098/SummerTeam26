@@ -1,56 +1,118 @@
 package org.firstinspires.ftc.teamcode.Mechanisms.Sorter;
 
-import android.graphics.Color;
-
-import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+
+import edu.ftcphoenix.fw.core.color.NormalizedRgba;
+import edu.ftcphoenix.fw.core.source.Source;
+import edu.ftcphoenix.fw.core.time.LoopClock;
+import edu.ftcphoenix.fw.ftc.FtcSensors;
 
 /**
- * Skeleton observer that uses two adjacent REV-style color sensors above the load station.
+ * Dual-color observer for the sorter load station.
  *
- * <p>This class is the recommended home for all sensor-side complexity:
+ * <p>This observer reads two adjacent normalized REV color sensors, classifies what each one sees,
+ * merges the two per-sensor classifications so a confident result from either sensor wins over
+ * ambiguity, and uses a Phoenix accumulator to remember the best slot result across an entire
+ * slot pass.
  *
+ * <p>Expected call pattern:
  * <ul>
- *   <li>reading both sensors,
- *   <li>classifying separator vs. slot base vs. artifact,
- *   <li>opening and interpreting a pass after the sorter says a slot entered the coarse read zone,
- *   <li>latching color across multiple loop samples,
- *   <li>building one final {@link SlotReadResult} at the end of the pass.
+ *   <li>{@link #beginSlotPass(int)} when a slot enters the read window,</li>
+ *   <li>{@link #sampleSlotPass(LoopClock)} every loop while the slot is under the sensors,</li>
+ *   <li>{@link #endSlotPass()} once the slot leaves the read window.</li>
  * </ul>
  *
- * <p>The sorter should never need to know how those details are implemented.
+ * <p>Minimal observer interface change required for Phoenix usage:
+ * <ul>
+ *   <li>{@code SeparatorDetection sampleForCalibration(LoopClock clock)}</li>
+ *   <li>{@code void sampleSlotPass(LoopClock clock)}</li>
+ * </ul>
  */
 final class DualColorLoadStationObserver implements LoadStationObserver {
 
     private static final String SENSOR_1_NAME = "color sensor 1";
     private static final String SENSOR_2_NAME = "color sensor 2";
 
-    private static final float[] HSV_BUFFER_1 = new float[3];
-    private static final float[] HSV_BUFFER_2 = new float[3];
+    /** Tune on-robot with the Phoenix color sensor tester. */
+    private static final float SENSOR_GAIN = 6.0f;
 
-    private final ColorSensor sensor1;
-    private final ColorSensor sensor2;
+    /**
+     * Very dim readings usually mean the sensor is looking at the far-away slot base / background.
+     * Keep this mostly alpha-based so changing the base from tan to black does not break logic.
+     */
+    private static final double SLOT_BASE_ALPHA_MAX = 0.040;
+    private static final double SLOT_BASE_ALPHA_RELAXED_MAX = 0.060;
+    private static final double SLOT_BASE_CHROMA_MAX = 0.030;
+
+    /**
+     * Separator is red and can be farther away than the top of an artifact, so let it classify
+     * with a slightly weaker brightness gate than the artifact color rules.
+     */
+    private static final double SEPARATOR_ALPHA_MIN = 0.025;
+    private static final double SEPARATOR_CHROMA_MIN = 0.025;
+    private static final double SEPARATOR_RED_RATIO_MIN = 0.52;
+    private static final double SEPARATOR_GREEN_RATIO_MAX = 0.25;
+    private static final double SEPARATOR_BLUE_RATIO_MAX = 0.22;
+
+    /** Confident artifact presence gate. */
+    private static final double ARTIFACT_ALPHA_MIN = 0.060;
+    private static final double ARTIFACT_CHROMA_MIN = 0.050;
+
+    /** Confident green artifact ratios. */
+    private static final double GREEN_GREEN_RATIO_MIN = 0.46;
+    private static final double GREEN_RED_RATIO_MAX = 0.32;
+    private static final double GREEN_BLUE_RATIO_MAX = 0.28;
+
+    /** Confident purple artifact ratios. */
+    private static final double PURPLE_RED_RATIO_MIN = 0.30;
+    private static final double PURPLE_BLUE_RATIO_MIN = 0.30;
+    private static final double PURPLE_GREEN_RATIO_MAX = 0.24;
+
+    private final Source<SensorFrame> frameSource;
+    private final Source<MergedObservation> mergedObservationSource;
+    private final Source<PassMemory> passMemorySource;
 
     private SurfaceKind currentSurface;
     private boolean passActive;
     private int activePassSlot;
     private boolean artifactSeen;
-    private SlotContent latchedCandidateContent;
+    private SlotContent latchedSlotContent;
+    private PassMemory passMemory;
 
     /**
      * Creates a new dual-color observer.
      *
-     * @param hardwareMap FTC hardware map containing the configured color sensors.
+     * @param hardwareMap FTC hardware map containing the configured normalized color sensors.
      */
     DualColorLoadStationObserver(HardwareMap hardwareMap) {
-        this.sensor1 = hardwareMap.get(ColorSensor.class, SENSOR_1_NAME);
-        this.sensor2 = hardwareMap.get(ColorSensor.class, SENSOR_2_NAME);
+        NormalizedColorSensor sensor1 = hardwareMap.get(NormalizedColorSensor.class, SENSOR_1_NAME);
+        NormalizedColorSensor sensor2 = hardwareMap.get(NormalizedColorSensor.class, SENSOR_2_NAME);
+
+        sensor1.setGain(SENSOR_GAIN);
+        sensor2.setGain(SENSOR_GAIN);
+
+        Source<NormalizedRgba> sensor1Color = FtcSensors.normalizedRgba(sensor1);
+        Source<NormalizedRgba> sensor2Color = FtcSensors.normalizedRgba(sensor2);
+
+        this.frameSource = Source.of(clock -> new SensorFrame(
+                        sensor1Color.get(clock),
+                        sensor2Color.get(clock)))
+                .memoized();
+
+        this.mergedObservationSource = frameSource
+                .map(DualColorLoadStationObserver::mergeFrame)
+                .memoized();
+
+        this.passMemorySource = mergedObservationSource
+                .accumulate(DualColorLoadStationObserver::updatePassMemory, PassMemory.EMPTY);
 
         this.currentSurface = SurfaceKind.UNKNOWN;
         this.passActive = false;
         this.activePassSlot = -1;
         this.artifactSeen = false;
-        this.latchedCandidateContent = SlotContent.UNKNOWN;
+        this.latchedSlotContent = SlotContent.UNKNOWN;
+        this.passMemory = PassMemory.EMPTY;
     }
 
     /**
@@ -58,6 +120,8 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      */
     @Override
     public void reset() {
+        frameSource.reset();
+        mergedObservationSource.reset();
         clearPassState();
         currentSurface = SurfaceKind.UNKNOWN;
     }
@@ -65,19 +129,16 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
     /**
      * Samples the sensors for calibration/reference finding.
      *
-     * <p>The eventual implementation should detect the distinctive separator appearance while the
-     * spinner is rotated slowly during calibration.
+     * <p>The main calibration job here is separator detection.</p>
      *
+     * @param clock current shared Phoenix loop clock.
      * @return reference-detection sample for the current loop.
      */
     @Override
-    public ReferenceDetection sampleForCalibration() {
-        SensorFrame frame = readSensor();
-        currentSurface = classifySurface(frame);
-
-        // TODO: replace this placeholder with real separator detection logic.
-        boolean separatorDetected = currentSurface == SurfaceKind.SEPARATOR;
-        return new ReferenceDetection(separatorDetected);
+    public SeparatorDetection sampleForCalibration(LoopClock clock) {
+        MergedObservation observation = mergedObservationSource.get(clock);
+        currentSurface = observation.surfaceKind;
+        return new SeparatorDetection(observation.separatorDetected);
     }
 
     /**
@@ -87,28 +148,32 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      */
     @Override
     public void beginSlotPass(int slotIndex) {
+        clearPassState();
         passActive = true;
         activePassSlot = slotIndex;
-        artifactSeen = false;
-        latchedCandidateContent = SlotContent.UNKNOWN;
+        currentSurface = SurfaceKind.UNKNOWN;
     }
 
     /**
      * Samples both sensors during an active pass.
      *
-     * <p>The eventual implementation should keep accumulating evidence across repeated calls.
+     * <p>This method is idempotent by {@link LoopClock#cycle()} because the Phoenix sources are
+     * memoized / accumulated by loop cycle.</p>
+     *
+     * @param clock current shared Phoenix loop clock.
      */
     @Override
-    public void sampleSlotPass() {
+    public void sampleSlotPass(LoopClock clock) {
         if (!passActive) {
             return;
         }
 
-        SensorFrame frame = readSensor();
-        currentSurface = classifySurface(frame);
+        MergedObservation observation = mergedObservationSource.get(clock);
+        currentSurface = observation.surfaceKind;
 
-        updateArtifactLatch(frame, currentSurface);
-        updateColorLatch(frame, currentSurface);
+        passMemory = passMemorySource.get(clock);
+        artifactSeen = passMemory.artifactSeen;
+        latchedSlotContent = passMemory.finalContent();
     }
 
     /**
@@ -118,7 +183,12 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      */
     @Override
     public SlotReadResult endSlotPass() {
-        SlotReadResult result = buildReadResult(activePassSlot);
+        if (!passActive) {
+            return new SlotReadResult(-1, SlotContent.UNKNOWN);
+        }
+
+        int slotIndex = activePassSlot;
+        SlotReadResult result = new SlotReadResult(slotIndex, passMemory.finalContent());
         clearPassState();
         return result;
     }
@@ -135,216 +205,279 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
                 passActive,
                 activePassSlot,
                 artifactSeen,
-                latchedCandidateContent);
+                latchedSlotContent);
     }
 
     /**
-     * Reads both color sensors and computes per-sensor HSV values.
+     * Classifies one sensor's current reading.
      *
-     * <p>This helper centralizes raw sensor access so the rest of the observer can work from one
-     * consistent frame object.
-     *
-     * @return current raw-and-derived sensor frame.
-     */
-    private SensorFrame readSensor() {
-        int red1 = sensor1.red();
-        int green1 = sensor1.green();
-        int blue1 = sensor1.blue();
-
-        int red2 = sensor2.red();
-        int green2 = sensor2.green();
-        int blue2 = sensor2.blue();
-
-        Color.RGBToHSV(red1, green1, blue1, HSV_BUFFER_1);
-        Color.RGBToHSV(red2, green2, blue2, HSV_BUFFER_2);
-
-        return new SensorFrame(
-                red1, green1, blue1, HSV_BUFFER_1[0],
-                red2, green2, blue2, HSV_BUFFER_2[0]);
-    }
-
-    /**
-     * Classifies what kind of surface the sensors appear to be seeing right now.
-     *
-     * <p>Expected future logic:
-     *
+     * <p>Policy:
      * <ul>
-     *   <li>detect slot base / black background,
-     *   <li>detect separator appearance for calibration,
-     *   <li>detect artifact presence,
-     *   <li>stay conservative when the sample is ambiguous.
+     *   <li>separator is a red reference marker for calibration,</li>
+     *   <li>green / purple are confident artifact colors,</li>
+     *   <li>artifact-unknown means "something artifact-like is here but color is not confident",</li>
+     *   <li>slot-base is mostly a dim/far-away reading and should work for tan or black bases.</li>
      * </ul>
-     *
-     * @param frame current sensor frame.
-     * @return current coarse surface classification.
      */
-    private SurfaceKind classifySurface(SensorFrame frame) {
-        // TODO: replace placeholder heuristics with tuned logic.
+    private static SensorObservation classifySingleSensor(NormalizedRgba color) {
+        double alpha = color.a;
+        double chroma = color.chroma();
+        double rRatio = color.rRatio();
+        double gRatio = color.gRatio();
+        double bRatio = color.bRatio();
 
+        boolean looksSeparator = alpha >= SEPARATOR_ALPHA_MIN
+                && chroma >= SEPARATOR_CHROMA_MIN
+                && rRatio >= SEPARATOR_RED_RATIO_MIN
+                && gRatio <= SEPARATOR_GREEN_RATIO_MAX
+                && bRatio <= SEPARATOR_BLUE_RATIO_MAX;
+        if (looksSeparator) {
+            return SensorObservation.SEPARATOR;
+        }
 
-
-        return SurfaceKind.UNKNOWN;
-    }
-
-    /**
-     * Updates the observer's "artifact seen" latch during an active pass.
-     *
-     * <p>The goal is to remember that the slot appeared occupied at some point during the pass,
-     * even if later samples briefly look like background due to holes or rolling.
-     *
-     * @param frame current sensor frame.
-     * @param surfaceKind coarse current surface classification.
-     */
-    private void updateArtifactLatch(SensorFrame frame, SurfaceKind surfaceKind) {
-        if (surfaceKind == SurfaceKind.ARTIFACT) {
-            artifactSeen = true;
-            if (latchedCandidateContent == SlotContent.UNKNOWN) {
-                latchedCandidateContent = SlotContent.OCCUPIED_UNKNOWN_COLOR;
+        boolean artifactStrength = alpha >= ARTIFACT_ALPHA_MIN && chroma >= ARTIFACT_CHROMA_MIN;
+        if (artifactStrength) {
+            boolean looksGreen = gRatio >= GREEN_GREEN_RATIO_MIN
+                    && rRatio <= GREEN_RED_RATIO_MAX
+                    && bRatio <= GREEN_BLUE_RATIO_MAX;
+            if (looksGreen) {
+                return SensorObservation.GREEN_ARTIFACT;
             }
+
+            boolean looksPurple = rRatio >= PURPLE_RED_RATIO_MIN
+                    && bRatio >= PURPLE_BLUE_RATIO_MIN
+                    && gRatio <= PURPLE_GREEN_RATIO_MAX;
+            if (looksPurple) {
+                return SensorObservation.PURPLE_ARTIFACT;
+            }
+
+            return SensorObservation.ARTIFACT_UNKNOWN;
         }
+
+        boolean looksBase = alpha <= SLOT_BASE_ALPHA_MAX
+                || (alpha <= SLOT_BASE_ALPHA_RELAXED_MAX && chroma <= SLOT_BASE_CHROMA_MAX);
+        if (looksBase) {
+            return SensorObservation.SLOT_BASE;
+        }
+
+        return SensorObservation.UNKNOWN;
     }
 
     /**
-     * Updates the latched color candidate for the active pass.
+     * Merges the two sensor observations for one loop sample.
      *
-     * <p>The intended design is to keep the best valid color seen anywhere in the pass rather than
-     * relying on only one instant in time.
-     *
-     * @param frame current sensor frame.
-     * @param surfaceKind coarse current surface classification.
+     * <p>A confident result from either sensor wins over uncertainty from the other sensor. This is
+     * the key rule that lets one sensor recover when the other is over a ball hole.</p>
      */
-    private void updateColorLatch(SensorFrame frame, SurfaceKind surfaceKind) {
-        if (surfaceKind != SurfaceKind.ARTIFACT) {
-            return;
+    private static MergedObservation mergeFrame(SensorFrame frame) {
+        SensorObservation left = classifySingleSensor(frame.sensor1);
+        SensorObservation right = classifySingleSensor(frame.sensor2);
+
+        boolean separatorDetected = left.separatorDetected || right.separatorDetected;
+        boolean backgroundEvidence = left.backgroundEvidence || right.backgroundEvidence;
+
+        boolean green = left.sampleContent == SlotContent.GREEN
+                || right.sampleContent == SlotContent.GREEN;
+        boolean purple = left.sampleContent == SlotContent.PURPLE
+                || right.sampleContent == SlotContent.PURPLE;
+        boolean artifactUnknown = left.sampleContent == SlotContent.OCCUPIED_UNKNOWN_COLOR
+                || right.sampleContent == SlotContent.OCCUPIED_UNKNOWN_COLOR;
+
+        if (green && purple) {
+            return new MergedObservation(
+                    SurfaceKind.ARTIFACT,
+                    true,
+                    separatorDetected,
+                    backgroundEvidence,
+                    SlotContent.OCCUPIED_UNKNOWN_COLOR);
         }
 
-        // TODO: replace placeholder logic with tuned hue / confidence rules.
-        // Example:
-        // if (looksPurple(frame)) { latchedCandidateContent = SlotContent.PURPLE; }
-        // if (looksGreen(frame))  { latchedCandidateContent = SlotContent.GREEN;  }
+        if (green) {
+            return new MergedObservation(
+                    SurfaceKind.ARTIFACT,
+                    true,
+                    separatorDetected,
+                    backgroundEvidence,
+                    SlotContent.GREEN);
+        }
+
+        if (purple) {
+            return new MergedObservation(
+                    SurfaceKind.ARTIFACT,
+                    true,
+                    separatorDetected,
+                    backgroundEvidence,
+                    SlotContent.PURPLE);
+        }
+
+        if (artifactUnknown) {
+            return new MergedObservation(
+                    SurfaceKind.ARTIFACT,
+                    true,
+                    separatorDetected,
+                    backgroundEvidence,
+                    SlotContent.OCCUPIED_UNKNOWN_COLOR);
+        }
+
+        if (separatorDetected) {
+            return new MergedObservation(
+                    SurfaceKind.SEPARATOR,
+                    false,
+                    true,
+                    backgroundEvidence,
+                    SlotContent.UNKNOWN);
+        }
+
+        if (left == SensorObservation.SLOT_BASE || right == SensorObservation.SLOT_BASE) {
+            return new MergedObservation(
+                    SurfaceKind.SLOT_BASE,
+                    false,
+                    false,
+                    backgroundEvidence,
+                    SlotContent.UNKNOWN);
+        }
+
+        return new MergedObservation(
+                SurfaceKind.UNKNOWN,
+                false,
+                false,
+                backgroundEvidence,
+                SlotContent.UNKNOWN);
     }
 
     /**
-     * Builds the final result for the completed pass.
-     *
-     * <p>Recommended semantics:
-     *
-     * <ul>
-     *   <li>no artifact ever seen -> {@link SlotContent#EMPTY}
-     *   <li>artifact seen and color latched -> {@link SlotContent#PURPLE} or {@link SlotContent#GREEN}
-     *   <li>artifact seen without confident color -> {@link SlotContent#OCCUPIED_UNKNOWN_COLOR}
-     * </ul>
-     *
-     * @param slotIndex observed slot index.
-     * @return final slot-read result.
+     * Phoenix reducer that accumulates pass memory across repeated loop samples.
      */
-    private SlotReadResult buildReadResult(int slotIndex) {
-        if (!artifactSeen) {
-            return new SlotReadResult(slotIndex, SlotContent.EMPTY);
-        }
-        return new SlotReadResult(slotIndex, latchedCandidateContent);
+    private static PassMemory updatePassMemory(PassMemory previous, MergedObservation current) {
+        return new PassMemory(
+                true,
+                previous.backgroundSeen || current.backgroundEvidence,
+                previous.artifactSeen || current.artifactDetected,
+                previous.greenSeen || current.sampleContent == SlotContent.GREEN,
+                previous.purpleSeen || current.sampleContent == SlotContent.PURPLE);
     }
 
     /**
      * Clears all per-pass latches.
      */
     private void clearPassState() {
+        passMemorySource.reset();
+        passMemory = PassMemory.EMPTY;
         passActive = false;
         activePassSlot = -1;
         artifactSeen = false;
-        latchedCandidateContent = SlotContent.UNKNOWN;
+        latchedSlotContent = SlotContent.UNKNOWN;
     }
 
     /**
-     * Save RGB and hue values from sensor
-     *
-     * One raw-and-derived sensor snapshot from both color sensors.
+     * One sensor snapshot from both color sensors.
      */
     private static final class SensorFrame {
+        private final NormalizedRgba sensor1;
+        private final NormalizedRgba sensor2;
 
-        private final int red1;
-        private final int green1;
-        private final int blue1;
-        private final float hue1;
+        private SensorFrame(NormalizedRgba sensor1, NormalizedRgba sensor2) {
+            this.sensor1 = sensor1;
+            this.sensor2 = sensor2;
+        }
+    }
 
-        private final int red2;
-        private final int green2;
-        private final int blue2;
-        private final float hue2;
+    /**
+     * Per-sensor classification before the two sensors are fused together.
+     */
+    private enum SensorObservation {
+        GREEN_ARTIFACT(true, false, false, SlotContent.GREEN),
+        PURPLE_ARTIFACT(true, false, false, SlotContent.PURPLE),
+        ARTIFACT_UNKNOWN(true, false, false, SlotContent.OCCUPIED_UNKNOWN_COLOR),
+        SEPARATOR(false, true, true, SlotContent.UNKNOWN),
+        SLOT_BASE(false, false, true, SlotContent.UNKNOWN),
+        UNKNOWN(false, false, false, SlotContent.UNKNOWN);
 
-        private SensorFrame(
-                int red1,
-                int green1,
-                int blue1,
-                float hue1,
-                int red2,
-                int green2,
-                int blue2,
-                float hue2) {
-            this.red1 = red1;
-            this.green1 = green1;
-            this.blue1 = blue1;
-            this.hue1 = hue1;
-            this.red2 = red2;
-            this.green2 = green2;
-            this.blue2 = blue2;
-            this.hue2 = hue2;
+        private final boolean artifactDetected;
+        private final boolean separatorDetected;
+        private final boolean backgroundEvidence;
+        private final SlotContent sampleContent;
+
+        SensorObservation(boolean artifactDetected,
+                          boolean separatorDetected,
+                          boolean backgroundEvidence,
+                          SlotContent sampleContent) {
+            this.artifactDetected = artifactDetected;
+            this.separatorDetected = separatorDetected;
+            this.backgroundEvidence = backgroundEvidence;
+            this.sampleContent = sampleContent;
+        }
+    }
+
+    /**
+     * Fused interpretation of both sensors for one loop sample.
+     */
+    private static final class MergedObservation {
+        private final SurfaceKind surfaceKind;
+        private final boolean artifactDetected;
+        private final boolean separatorDetected;
+        private final boolean backgroundEvidence;
+        private final SlotContent sampleContent;
+
+        private MergedObservation(SurfaceKind surfaceKind,
+                                  boolean artifactDetected,
+                                  boolean separatorDetected,
+                                  boolean backgroundEvidence,
+                                  SlotContent sampleContent) {
+            this.surfaceKind = surfaceKind;
+            this.artifactDetected = artifactDetected;
+            this.separatorDetected = separatorDetected;
+            this.backgroundEvidence = backgroundEvidence;
+            this.sampleContent = sampleContent;
+        }
+    }
+
+    /**
+     * Slot-pass memory held by the Phoenix accumulator.
+     */
+    private static final class PassMemory {
+        private static final PassMemory EMPTY = new PassMemory(false, false, false, false, false);
+
+        private final boolean anySample;
+        private final boolean backgroundSeen;
+        private final boolean artifactSeen;
+        private final boolean greenSeen;
+        private final boolean purpleSeen;
+
+        private PassMemory(boolean anySample,
+                           boolean backgroundSeen,
+                           boolean artifactSeen,
+                           boolean greenSeen,
+                           boolean purpleSeen) {
+            this.anySample = anySample;
+            this.backgroundSeen = backgroundSeen;
+            this.artifactSeen = artifactSeen;
+            this.greenSeen = greenSeen;
+            this.purpleSeen = purpleSeen;
         }
 
-        /**
-         * Returns the first sensor's red channel.
-         */
-        int getRed1() {
-            return red1;
-        }
+        private SlotContent finalContent() {
+            if (!anySample) {
+                return SlotContent.UNKNOWN;
+            }
 
-        /**
-         * Returns the first sensor's green channel.
-         */
-        int getGreen1() {
-            return green1;
-        }
+            if (greenSeen && !purpleSeen) {
+                return SlotContent.GREEN;
+            }
 
-        /**
-         * Returns the first sensor's blue channel.
-         */
-        int getBlue1() {
-            return blue1;
-        }
+            if (purpleSeen && !greenSeen) {
+                return SlotContent.PURPLE;
+            }
 
-        /**
-         * Returns the first sensor's hue.
-         */
-        float getHue1() {
-            return hue1;
-        }
+            if (artifactSeen) {
+                return SlotContent.OCCUPIED_UNKNOWN_COLOR;
+            }
 
-        /**
-         * Returns the second sensor's red channel.
-         */
-        int getRed2() {
-            return red2;
-        }
+            if (backgroundSeen) {
+                return SlotContent.EMPTY;
+            }
 
-        /**
-         * Returns the second sensor's green channel.
-         */
-        int getGreen2() {
-            return green2;
-        }
-
-        /**
-         * Returns the second sensor's blue channel.
-         */
-        int getBlue2() {
-            return blue2;
-        }
-
-        /**
-         * Returns the second sensor's hue.
-         */
-        float getHue2() {
-            return hue2;
+            return SlotContent.UNKNOWN;
         }
     }
 }

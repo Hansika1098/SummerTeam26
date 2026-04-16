@@ -8,7 +8,7 @@ package org.firstinspires.ftc.teamcode.Mechanisms.Sorter;
  * <p>This object is intentionally small. The sorter mainly needs to know whether the observer has
  * seen the separator transition or separator state strongly enough to lock a geometric reference.
  */
-final class ReferenceDetection {
+final class SeparatorDetection {
 
     private final boolean separatorDetected;
 
@@ -18,7 +18,7 @@ final class ReferenceDetection {
      * @param separatorDetected whether the observer believes the separator reference should be
      *                          treated as detected on this sample.
      */
-    ReferenceDetection(boolean separatorDetected) {
+    SeparatorDetection(boolean separatorDetected) {
         this.separatorDetected = separatorDetected;
     }
 

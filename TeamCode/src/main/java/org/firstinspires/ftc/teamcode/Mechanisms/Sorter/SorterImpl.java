@@ -45,18 +45,18 @@ public class SorterImpl implements Sorter {
 
     private int targetSlot = -1;
     private double targetAngle = getAngleForSlot(targetSlot);
-
+    private static final double TICKS_PER_REV = 0;// replace with the motors actual value
     private static final double DEGREES_PER_TICK = 360.0 / TICKS_PER_REV;
 
-    private static final double TICKS_PER_REV = 0;// replac with the motors actual value
 
 
 
 
 
-    private final double DEGREES_PER_SLOT= 45.0
+    private final double DEGREES_PER_SLOT= 45.0;
 
             //idk the degrees lowk so i js put random number
+    // i think its just 360/3 degrees (3 slots in a circle)
 
     /**
      * Creates a sorter implementation using the default dual color sensor observer.
@@ -297,7 +297,7 @@ public class SorterImpl implements Sorter {
             return CommandResult.REJECTED_NOT_CALIBRATED;
         }//reject if slot is empty or unknown
         if (slots[slotIndex] == SlotContent.UNKNOWN || slots[slotIndex] == SlotContent.EMPTY) {
-            return CommandResult.REJECTED_NOT_READY;
+//            return CommandResult.REJECTED_NOT_READY;
 
             //set the target slot and target angle
             targetSlot = slotIndex;

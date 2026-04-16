@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.Mechanisms.Sorter;
 
+import edu.ftcphoenix.fw.core.time.LoopClock;
+
 /**
  * Internal contract for the load-station sensor subsystem.
  *
@@ -29,19 +31,20 @@ interface LoadStationObserver {
 
     /**
      * Does it see a seperator?
-     * 
+     * <p>
      * Samples the sensors for calibration/reference finding.
      *
      * <p>This method is used while the spinner slowly rotates in search of a separator transition
      * that can serve as a trusted angular reference.
      *
+     * @param clock current shared Phoenix loop clock.
      * @return current calibration/reference signal derived from the sensors.
      */
-    ReferenceDetection sampleForCalibration();
+    SeparatorDetection sampleForCalibration(LoopClock clock);
 
     /**
      * New slot!!
-     * 
+     * <p>
      * Starts a new slot pass for the given logical slot.
      *
      * <p>The sorter decides when a slot has entered the coarse read zone based on spinner geometry.
@@ -53,17 +56,19 @@ interface LoadStationObserver {
 
     /**
      * Read color :)
-     * 
+     * <p>
      * Samples sensors during an active slot pass.
      *
      * <p>The observer should retain state between calls. Repeated calls during the same pass are
      * expected and should be used to latch presence and color information over time.
+     *
+     * @param clock current shared Phoenix loop clock.
      */
-    void sampleSlotPass();
+    void sampleSlotPass(LoopClock clock);
 
     /**
      * Stop reading color & return result
-     * 
+     * <p>
      * Ends the active slot pass and returns one committed result for the slot.
      *
      * <p>The returned result should summarize the observer's best belief for that pass. The sorter
@@ -75,7 +80,7 @@ interface LoadStationObserver {
 
     /**
      * Return an object with a bunch of details (for testing)
-     * 
+     * <p>
      * Returns observer-specific debug information for tuning.
      *
      * @return debug snapshot of the observer's current internal sensing state.
