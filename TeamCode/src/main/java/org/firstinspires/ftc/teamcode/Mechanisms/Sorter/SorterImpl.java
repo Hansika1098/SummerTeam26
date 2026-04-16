@@ -18,6 +18,8 @@ import com.qualcomm.robotcore.hardware.DcMotor;
  * separator detection, read-window latching, and conversion of one slot pass into one
  * {@link SlotReadResult}.
  */
+
+
 public class SorterImpl implements Sorter {
 
 
@@ -46,7 +48,7 @@ public class SorterImpl implements Sorter {
     private int targetSlot = -1;
     private double targetAngle = getAngleForSlot(targetSlot);
 
-    private static final double DEGREES_PER_TICK = 360.0 / TICKS_PER_REV;
+        //private static final double DEGREES_PER_TICK = 360.0 / TICKS_PER_REV;
 
     private static final double TICKS_PER_REV = 0;// replac with the motors actual value
 
@@ -54,7 +56,7 @@ public class SorterImpl implements Sorter {
 
 
 
-    private final double DEGREES_PER_SLOT= 45.0
+    private final double DEGREES_PER_SLOT= 120.0;
 
             //idk the degrees lowk so i js put random number
 
@@ -395,7 +397,6 @@ public class SorterImpl implements Sorter {
      * intervention that invalidated the slot table.
      */
     private void updateInventoryScan() {
-        private void updateInventoryScan() {
 
             // Safety: if we somehow lose calibration, stop immediately.
             if (!isCalibrated()) {
@@ -424,7 +425,7 @@ public class SorterImpl implements Sorter {
                 setSpinnerPower(0.0);
                 action = SorterAction.IDLE;
             }
-        }
+
         // TODO: implement inventory-scan state machine.
     }
 
@@ -433,7 +434,7 @@ public class SorterImpl implements Sorter {
      */
     private void updatePrepareLoad() {
 
-        private void updatePrepareLoad() {
+
 
             // must have valid slot chosen at LOAD  moves known empty slot to load station
             if (loadSlot < 0) return;
@@ -465,7 +466,7 @@ public class SorterImpl implements Sorter {
                 double power = 0.3 * Math.signum(error);
                 setSpinnerPower(power);
             }
-        }
+
         // TODO: implement motion and completion rules for prepare-load.
 
 
@@ -523,7 +524,7 @@ public class SorterImpl implements Sorter {
 
     private double getCurrentSpinnerAngle() {
         int ticks = spinnerMotor.getCurrentPosition();
-        return ticks * DEGREES_PER_TICK;
+        return ticks * DEGREES_PER_SLOT; //FIXXXXX its deegrees per tick but its mpt defimed
     }
 
 
@@ -571,7 +572,7 @@ public class SorterImpl implements Sorter {
 
 
 
-            action = SorterAction.IDLE;
+            //action = SorterAction.IDLE;
         }
 
 
@@ -684,3 +685,4 @@ public class SorterImpl implements Sorter {
         }
     }
 }
+
