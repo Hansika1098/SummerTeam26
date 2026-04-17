@@ -41,33 +41,33 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      * Very dim readings usually mean the sensor is looking at the far-away slot base / background.
      * Keep this mostly alpha-based so changing the base from tan to black does not break logic.
      */
-    private static final double SLOT_BASE_ALPHA_MAX = 0.040;
-    private static final double SLOT_BASE_ALPHA_RELAXED_MAX = 0.060;
-    private static final double SLOT_BASE_CHROMA_MAX = 0.030;
+    private static final double SLOT_BASE_ALPHA_MAX = 0.036;
+    private static final double SLOT_BASE_ALPHA_RELAXED_MAX = 0.03;
+    private static final double SLOT_BASE_CHROMA_MAX = 0.0035;
 
     /**
      * Separator is red and can be farther away than the top of an artifact, so let it classify
      * with a slightly weaker brightness gate than the artifact color rules.
      */
-    private static final double SEPARATOR_ALPHA_MIN = 0.025;
-    private static final double SEPARATOR_CHROMA_MIN = 0.025;
-    private static final double SEPARATOR_RED_RATIO_MIN = 0.52;
-    private static final double SEPARATOR_GREEN_RATIO_MAX = 0.25;
-    private static final double SEPARATOR_BLUE_RATIO_MAX = 0.22;
+    private static final double SEPARATOR_ALPHA_MIN = 0.28;
+    private static final double SEPARATOR_CHROMA_MIN = 0.001;
+    private static final double SEPARATOR_RED_RATIO_MIN = 0.26;
+    private static final double SEPARATOR_GREEN_RATIO_MAX = 0.41;
+    private static final double SEPARATOR_BLUE_RATIO_MAX = 0.335;
 
     /** Confident artifact presence gate. */
     private static final double ARTIFACT_ALPHA_MIN = 0.060;
-    private static final double ARTIFACT_CHROMA_MIN = 0.050;
+    private static final double ARTIFACT_CHROMA_MIN = 0.008;
 
     /** Confident green artifact ratios. */
-    private static final double GREEN_GREEN_RATIO_MIN = 0.46;
-    private static final double GREEN_RED_RATIO_MAX = 0.32;
-    private static final double GREEN_BLUE_RATIO_MAX = 0.28;
+    private static final double GREEN_GREEN_RATIO_MIN = 0.43;
+    private static final double GREEN_RED_RATIO_MAX = 0.2;
+    private static final double GREEN_BLUE_RATIO_MAX = 0.38;
 
     /** Confident purple artifact ratios. */
-    private static final double PURPLE_RED_RATIO_MIN = 0.30;
-    private static final double PURPLE_BLUE_RATIO_MIN = 0.30;
-    private static final double PURPLE_GREEN_RATIO_MAX = 0.24;
+    private static final double PURPLE_RED_RATIO_MIN = 0.25;
+    private static final double PURPLE_BLUE_RATIO_MIN = 0.38;
+    private static final double PURPLE_GREEN_RATIO_MAX = 0.35;
 
     private final Source<SensorFrame> frameSource;
     private final Source<MergedObservation> mergedObservationSource;

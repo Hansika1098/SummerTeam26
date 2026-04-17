@@ -33,9 +33,9 @@ public class SensorReadTest extends LinearOpMode {
         clock.reset(getRuntime());
 
         // get reference to the color sensor
-        sensorColor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        sensorColor = hardwareMap.get(NormalizedColorSensor.class, "color sensor 1");
 
-        sensorColor.setGain(0.6f);
+        sensorColor.setGain(10f);
 
         Source<NormalizedRgba> sensorSource = FtcSensors.normalizedRgba(sensorColor);
 
@@ -44,8 +44,9 @@ public class SensorReadTest extends LinearOpMode {
 
         // loop & read RGB data
         while (opModeIsActive()) {
-
+            clock.update(getRuntime());
             NormalizedRgba color = sensorSource.get(clock);
+
             /*
             // convert RGB values to HSV values
             // multiply by the scale factor
