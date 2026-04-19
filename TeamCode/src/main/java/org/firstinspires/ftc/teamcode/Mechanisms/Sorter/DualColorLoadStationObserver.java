@@ -49,15 +49,15 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
      * Separator is red and can be farther away than the top of an artifact, so let it classify
      * with a slightly weaker brightness gate than the artifact color rules.
      */
-    private static final double SEPARATOR_ALPHA_MIN = 0.28;
-    private static final double SEPARATOR_CHROMA_MIN = 0.001;
-    private static final double SEPARATOR_RED_RATIO_MIN = 0.26;
-    private static final double SEPARATOR_GREEN_RATIO_MAX = 0.41;
-    private static final double SEPARATOR_BLUE_RATIO_MAX = 0.335;
+    private static final double SEPARATOR_ALPHA_MIN = 0.2;
+    private static final double SEPARATOR_CHROMA_MIN = 0.004;
+    private static final double SEPARATOR_RED_RATIO_MIN = 0.34;
+    private static final double SEPARATOR_GREEN_RATIO_MAX = 0.39;
+    private static final double SEPARATOR_BLUE_RATIO_MAX = 0.28;
 
     /** Confident artifact presence gate. */
     private static final double ARTIFACT_ALPHA_MIN = 0.060;
-    private static final double ARTIFACT_CHROMA_MIN = 0.008;
+    private static final double ARTIFACT_CHROMA_MIN = 0.004;
 
     /** Confident green artifact ratios. */
     private static final double GREEN_GREEN_RATIO_MIN = 0.43;
@@ -138,7 +138,8 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
     public SeparatorDetection sampleForCalibration(LoopClock clock) {
         MergedObservation observation = mergedObservationSource.get(clock);
         currentSurface = observation.surfaceKind;
-        return new SeparatorDetection(observation.separatorDetected);
+//        return new SeparatorDetection(observation.separatorDetected);
+        return new SeparatorDetection(true);
     }
 
     /**
