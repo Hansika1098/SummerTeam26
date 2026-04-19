@@ -178,7 +178,7 @@ import edu.ftcphoenix.fw.core.time.LoopClock;
             return CommandResult.REJECTED_BUSY;
         }
 
-        calibrationState = CalibrationState.SEARCHING_SEPARATOR;
+        // calibrationState = CalibrationState.SEARCHING_SEPARATOR;
         action = SorterAction.CALIBRATING;
         slotPassActive = false;
         activePassSlot = -1;
