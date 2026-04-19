@@ -219,7 +219,7 @@ import edu.ftcphoenix.fw.core.time.LoopClock;
     }
 
     /**
-     * Returns the committed belief for one slot.
+     * Returns the committed belief for one wslot.
      *
      * @param slotIndex logical slot index.
      * @return current slot belief.
@@ -443,6 +443,16 @@ import edu.ftcphoenix.fw.core.time.LoopClock;
 
                         calibrationState = CalibrationState.ALIGNING_REFERENCE;
                     }
+
+                    /*
+
+                    every 120 degrees is a new slot
+
+                    NOTE: use ticks, not seperator detection to identify when a new slot starts
+
+                    no PID needed??
+
+                     */
 
                     return;
                 }
