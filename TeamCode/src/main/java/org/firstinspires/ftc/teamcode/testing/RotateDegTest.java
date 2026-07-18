@@ -5,15 +5,19 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 
-@TeleOp(name = "spin 120 degrees test", group = "Sorter")
+/**
+ * Student B's low-power, hold-to-run spinner measurement tool.
+ *
+ * <p>The ticks-per-revolution value is only a provisional display aid. Measure direction and
+ * encoder travel on the real robot before using either value as sorter geometry.
+ */
+@TeleOp(name = "Spinner low-power jog test", group = "Sorter")
 public class RotateDegTest extends OpMode {
+
+    private static final double JOG_POWER = 0.08;
+    private static final double PROVISIONAL_TICKS_PER_REV = 383.5;
+
     private DcMotorEx spinner;
-
-    private static final double TICKS_PER_REV = 383.5;
-    private static final double TICKS_PER_DEGREE = TICKS_PER_REV / 360.0;
-    private static final int TICKS_FOR_120 = (int) Math.round(120 * TICKS_PER_DEGREE);
-
-    private boolean lastX = false;
 
     @Override
     public void init() {
@@ -21,28 +25,37 @@ public class RotateDegTest extends OpMode {
 
         spinner.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         spinner.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        spinner.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        spinner.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        spinner.setPower(0.0);
     }
 
     @Override
     public void loop() {
-        if (gamepad1.x && !lastX) {
-            int target = spinner.getCurrentPosition() + TICKS_FOR_120;
-
-            spinner.setTargetPosition(target);
-            spinner.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            spinner.setPower(0.25);
+        double requestedPower = 0.0;
+        if (gamepad1.dpad_right && !gamepad1.dpad_left) {
+            requestedPower = JOG_POWER;
+        } else if (gamepad1.dpad_left && !gamepad1.dpad_right) {
+            requestedPower = -JOG_POWER;
         }
 
-        if (!spinner.isBusy()) {
-            spinner.setPower(0);
-        }
+        spinner.setPower(requestedPower);
 
-        lastX = gamepad1.x;
-
+        telemetry.addLine("Hold D-pad LEFT/RIGHT to jog; release to stop");
+        telemetry.addLine("Keep hands and loose items clear; use Driver Station STOP if needed");
         telemetry.addData("Current ticks", spinner.getCurrentPosition());
-        telemetry.addData("Ticks for 120", TICKS_FOR_120);
-        telemetry.addData("Busy", spinner.isBusy());
+        telemetry.addData("Commanded power", "%.2f", requestedPower);
+        telemetry.addData("Provisional ticks/rev", PROVISIONAL_TICKS_PER_REV);
+        telemetry.addData(
+                "Provisional angle",
+                "%.1f",
+                spinner.getCurrentPosition() * 360.0 / PROVISIONAL_TICKS_PER_REV);
         telemetry.update();
+    }
+
+    @Override
+    public void stop() {
+        if (spinner != null) {
+            spinner.setPower(0.0);
+        }
     }
 }

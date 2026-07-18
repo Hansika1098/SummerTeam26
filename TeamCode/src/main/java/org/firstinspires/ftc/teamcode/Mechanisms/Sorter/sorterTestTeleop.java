@@ -7,6 +7,11 @@ import edu.ftcphoenix.fw.core.time.LoopClock;
 import edu.ftcphoenix.fw.input.Gamepads;
 import edu.ftcphoenix.fw.input.binding.Bindings;
 
+/**
+ * Student B's focused test surface for a manual reference followed by one inventory scan.
+ *
+ * <p>Unfinished load, present, and feed controls are intentionally not exposed here.
+ */
 @TeleOp(name = "Sorter Test Teleop", group = "Sorter")
 public final class sorterTestTeleop extends OpMode {
 
@@ -29,20 +34,10 @@ public final class sorterTestTeleop extends OpMode {
         sorter = new SorterImpl(hardwareMap, clock);
         debugSorter = (SorterImpl) sorter;
 
-        bindings.onRise(gamepads.p1().a(), () -> sorter.startCalibration());
-        bindings.onRise(gamepads.p1().b(), () -> sorter.startInventoryScan());
-        bindings.onRise(gamepads.p1().x(), () -> sorter.tryPrepareLoad());
-        bindings.onRise(gamepads.p1().y(), () -> sorter.tryFeed());
-
-        bindings.onRise(gamepads.p1().dpadLeft(), () ->
-                lastCommandResult = "Present 0: " + sorter.tryPresentSlot(0));
-        bindings.onRise(gamepads.p1().dpadUp(), () ->
-                lastCommandResult = "Present 1: " + sorter.tryPresentSlot(1));
-        bindings.onRise(gamepads.p1().dpadRight(), () ->
-                lastCommandResult = "Present 2: " + sorter.tryPresentSlot(2));
-
-        bindings.onRise(gamepads.p1().rightBumper(), sorter::confirmShotComplete);
-        bindings.onRise(gamepads.p1().leftBumper(), sorter::clearInventory);
+        bindings.onRise(gamepads.p1().a(), () ->
+                lastCommandResult = "Manual reference: " + sorter.startCalibration());
+        bindings.onRise(gamepads.p1().b(), () ->
+                lastCommandResult = "Inventory scan: " + sorter.startInventoryScan());
     }
 
     @Override
@@ -57,10 +52,19 @@ public final class sorterTestTeleop extends OpMode {
         renderTelemetry();
     }
 
+    @Override
+    public void stop() {
+        if (debugSorter != null) {
+            debugSorter.stopForOpMode();
+        }
+    }
+
     private void renderTelemetry() {
         SorterStatus status = sorter.getStatus();
 
         telemetry.addLine("Sorter Debug");
+        telemetry.addLine("Keep hands and loose items clear; Driver Station STOP stops the motor");
+        telemetry.addData("Last command", lastCommandResult);
         telemetry.addData("Action", status.getAction());
         telemetry.addData("Calibration", status.getCalibrationState());
 
@@ -84,11 +88,9 @@ public final class sorterTestTeleop extends OpMode {
         telemetry.addData("Slot 2", sorter.getSlotContent(2));
 
         telemetry.addLine("--- Controls ---");
-        telemetry.addLine("A calibrate");
+        telemetry.addLine("Before A: align the leading edge of physical slot 0 at observer 0°");
+        telemetry.addLine("A = set test-only manual reference (not automatic calibration)");
         telemetry.addLine("B inventory scan");
-        telemetry.addLine("X prepare load");
-        telemetry.addLine("Y feed");
-        telemetry.addLine("Dpad L/U/R present 0/1/2");
 
         telemetry.update();
     }

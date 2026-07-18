@@ -37,6 +37,8 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
     /** Tune on-robot with the Phoenix color sensor tester. */
     private static final float SENSOR_GAIN = 6.0f;
 
+    // STUDENT A: change these thresholds only after recording both sensors under real lighting.
+
     /**
      * Very dim readings usually mean the sensor is looking at the far-away slot base / background.
      * Keep this mostly alpha-based so changing the base from tan to black does not break logic.
@@ -138,7 +140,9 @@ final class DualColorLoadStationObserver implements LoadStationObserver {
     public SeparatorDetection sampleForCalibration(LoopClock clock) {
         MergedObservation observation = mergedObservationSource.get(clock);
         currentSurface = observation.surfaceKind;
-//        return new SeparatorDetection(observation.separatorDetected);
+
+        // TODO(A): This constant makes every surface look like a separator. Which part of the
+        // merged observation represents the real separator evidence?
         return new SeparatorDetection(true);
     }
 

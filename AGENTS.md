@@ -75,6 +75,8 @@ Important sorter files:
 - `Mechanisms/Sorter/SorterStatus.java` and `SlotContent.java` — public read-only state.
 - `docs/sorter-interface-contract.md` — intended ownership and command contract, with the stale
   load-station/observer location caveat above.
+- `docs/software-work-distribution.md` — current 3–5 hour student assignments, exclusive file
+  ownership, acceptance checks, and intentionally out-of-scope work.
 - `Mechanisms/Sorter/ObserverTeleop.java` and `Mechanisms/Sorter/sorterTestTeleop.java` — focused
   bring-up OpModes.
 - `testing/RotateDegTest.java` and `testing/SensorReadTest.java` — limited motor and sensor tests.
@@ -195,8 +197,8 @@ Treat these as known limitations to investigate, not established behavior to pre
 - motor direction, gear ratio, the `383.5` ticks/revolution assumption, motion tolerances, and
   open-loop powers require real-hardware validation,
 - the current feed routine is not a complete, measured feed cycle,
-- production observer gain is 6 while `SensorReadTest` uses gain 10, so readings are not directly
-  interchangeable,
+- `SensorReadTest` now matches production gain 6 but intentionally reads only sensor 1; Student A
+  must add separate sensor-2 telemetry before comparing or tuning both sensors,
 - color thresholds and separator/base rules are provisional and require telemetry from both
   sensors under real lighting,
 - the repository has no automated sorter tests, the main `Teleop.java` is empty, and no loader or
@@ -206,6 +208,35 @@ Do not silently repair several of these at once. Pick one observable behavior, s
 physical result, make the smallest change, and validate it.
 
 ## Mentoring and implementation style
+
+### Hint-first student support
+
+For student-assigned work, optimize for learning and student-authored code, not the fastest
+completed patch. Unless the mentor explicitly asks Codex to implement or scaffold the work, guide
+the student instead of completing the assignment for them.
+
+Use progressive help, stopping as soon as the student can continue:
+
+1. Ask the student to describe the expected physical input, decision, and output, and to share
+   their current attempt or telemetry.
+2. Point to one relevant file, public function, or existing pattern, then ask one focused question
+   that helps them choose the next step.
+3. Give plain-language steps or short pseudocode.
+4. If needed, show the smallest useful code fragment, method signature, or condition—not a complete
+   method or file—and have the student adapt it.
+5. Review the student's attempt, explain one specific issue, and suggest one next change.
+
+After a hint, let the student try it and bring back compiler output, telemetry, or observed robot
+behavior. Ask them to predict what their change should do before testing it. Do not silently edit
+student-assignment files, provide a copy-paste solution, or replace an entire method merely because
+that is faster. Do not turn help into an endless quiz either: state API facts directly, explain
+unfamiliar Java syntax, and move to the next hint level when the student remains blocked.
+
+A complete implementation is appropriate only when the mentor explicitly requests it, the learning
+exercise is declared complete, unrelated boilerplate does not solve the assigned concept, or a
+complete safety stop path is needed before hardware testing. Even then, explain the important
+choices and leave student-owned follow-up work to the student when practical. Safety always
+overrides hint-first pacing.
 
 When helping a student:
 

@@ -604,6 +604,10 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
      * intervention that invalidated the slot table.
      */
     private void updateInventoryScan() {
+        // STUDENT B ASSIGNMENT: use robot measurements to verify that one manual slot-0 reference
+        // produces exactly three begin/sample/end passes. Keep this method non-blocking and stop
+        // motor power on every exit. Calibration geometry, prepare, present, and feed are out of
+        // scope for this assignment.
 
         // Safety: if we somehow lose calibration, stop immediately.
         if (!isCalibrated()) {
@@ -622,6 +626,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
         // start first pass
         if (!slotPassActive) {
+            // TODO(B): How will telemetry prove this sector is physical slot 0?
             beginSlotPass(currentSlot);
             loadStationObserver.sampleSlotPass(clock);
             return;
@@ -634,9 +639,11 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
         }
 
         // moved into new slot, so finish old one
+        // TODO(B): Verify this transition occurs once per physical slot.
         endSlotPass();
 
         // stop if 3 slots were already scanned
+        // TODO(B): Verify this is the only successful completion path and power is zero here.
         if (completedScanPasses >= SLOT_COUNT) {
             setSpinnerPower(0.0);
             action = SorterAction.IDLE;
@@ -910,6 +917,15 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
     }
 
     /**
+     * Stops spinner output when the focused sorter test OpMode is stopped.
+     *
+     * <p>This is package-private test cleanup, not a new public sorter command.
+     */
+    void stopForOpMode() {
+        setSpinnerPower(0.0);
+    }
+
+    /**
      * Validates a slot index.
      *
      * @param slotIndex slot index to validate.
@@ -922,4 +938,3 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
     }
 
 }
-

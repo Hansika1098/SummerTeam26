@@ -1,4 +1,5 @@
 package org.firstinspires.ftc.teamcode.Mechanisms.Sorter;
+
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -8,6 +9,12 @@ import edu.ftcphoenix.fw.core.time.LoopClock;
 import edu.ftcphoenix.fw.input.Gamepads;
 import edu.ftcphoenix.fw.input.binding.Bindings;
 
+/**
+ * Student A's motor-free test for one complete observer pass at a time.
+ *
+ * <p>Move the spinner only with the mentor-approved manual procedure and after confirming it is
+ * safe to back-drive. This OpMode does not command the spinner motor.
+ */
 @TeleOp(name = "Sorter: DualColor Observer Test", group = "Sorter")
 public final class ObserverTeleop extends OpMode {
 
@@ -38,7 +45,7 @@ public final class ObserverTeleop extends OpMode {
         activeSlotIndex = FIRST_SLOT_INDEX;
         observer.beginSlotPass(activeSlotIndex);
 
-        telemetry.log().add("Observer test ready. Press START to begin slot testing.");
+        telemetry.log().add("Observer test ready; this OpMode does not control the spinner.");
     }
 
     @Override
@@ -95,7 +102,8 @@ public final class ObserverTeleop extends OpMode {
         ObserverDebug debug = observer.getDebug();
 
         telemetry.addLine("DualColorLoadStationObserver Test");
-        telemetry.addLine("A = finish current slot + begin next");
+        telemetry.addLine("MOTOR OFF: manually move one complete slot under the observer");
+        telemetry.addLine("A = finish after the slot's trailing edge passes");
         telemetry.addLine("B = reset observer test to slot 0");
         telemetry.addData("clock.cycle", clock.cycle());
         telemetry.addData("clock.dtSec", clock.dtSec());
